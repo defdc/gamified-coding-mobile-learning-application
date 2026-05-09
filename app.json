@@ -1,0 +1,22 @@
+{
+  "expo": {
+    "name": "Gamified Coding Research",
+    "slug": "gamified-coding-research",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "assetBundlePatterns": ["**/*"],
+    "ios": {
+      "supportsTablet": true
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#ffffff"
+      },
+      "package": "com.research.gamifiedcoding"
+    },
+    "web": {
+      "bundler": "metro"
+    }
+  }
+}
