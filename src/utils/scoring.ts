@@ -18,12 +18,17 @@ export function isAllQuestionsAnswered(
   return questions.every((question) => Boolean(answers[question.id]));
 }
 
+function todayDateIso(): string {
+  return new Date().toISOString().slice(0, 10);
+}
+
 export function createInitialGamificationState(): GamificationState {
   return {
     xp: 0,
     level: 1,
     badges: [],
     streak: 0,
+    lastActiveDate: null,
     completedModuleIds: []
   };
 }
@@ -37,32 +42,37 @@ export function awardModuleCompletion(
     return previousState;
   }
 
+  const today = todayDateIso();
+  const last = previousState.lastActiveDate;
+
+  let nextStreak: number;
+  if (last === null) {
+    nextStreak = 1;
+  } else if (last === today) {
+    nextStreak = previousState.streak;
+  } else {
+    const diffDays = Math.round(
+      (new Date(today).getTime() - new Date(last).getTime()) / 86_400_000
+    );
+    nextStreak = diffDays === 1 ? previousState.streak + 1 : 1;
+  }
+
   const xpGain = quizCorrect ? 40 : 20;
   const nextXp = previousState.xp + xpGain;
   const nextLevel = Math.floor(nextXp / 100) + 1;
   const completedModuleIds = [...previousState.completedModuleIds, moduleId];
   const badges = new Set(previousState.badges);
 
-  if (completedModuleIds.length === 1) {
-    badges.add('First Step');
-  }
-
-  if (completedModuleIds.length === 3) {
-    badges.add('Consistent Learner');
-  }
-
-  if (completedModuleIds.length >= 5) {
-    badges.add('Coding Starter');
-  }
-
-  if (quizCorrect) {
-    badges.add('Problem Solver');
-  }
+  if (completedModuleIds.length === 1) badges.add('First Step');
+  if (completedModuleIds.length === 3) badges.add('Consistent Learner');
+  if (completedModuleIds.length >= 5) badges.add('Coding Starter');
+  if (quizCorrect) badges.add('Problem Solver');
 
   return {
     xp: nextXp,
     level: nextLevel,
-    streak: Math.min(previousState.streak + 1, 30),
+    streak: Math.min(nextStreak, 30),
+    lastActiveDate: today,
     badges: Array.from(badges),
     completedModuleIds
   };

@@ -74,7 +74,6 @@ export interface ModuleProgress {
   moduleId: string;
   quizAnswer: string;
   quizCorrect: boolean;
-  completedAtIso: string;
   timeSpentSeconds: number;
 }
 
@@ -83,18 +82,25 @@ export interface GamificationState {
   level: number;
   badges: string[];
   streak: number;
+  lastActiveDate: string | null;
   completedModuleIds: string[];
 }
 
 export interface QuestionnaireResult {
   respondentId: string;
   group: ResearchGroup;
+  // Five core constructs — collected from BOTH groups
   engagement: Record<string, number>;
   motivation: Record<string, number>;
   usability: Record<string, number>;
   satisfaction: Record<string, number>;
   perceivedDifficulty: Record<string, number>;
-  gamificationElements?: Record<string, number>;
+  // Gamification-attitude fields — ON group only
+  gamViews?: Record<string, number>;
+  gamMotivation?: number;
+  gamBasicNeeds?: Record<string, number>;
+  gamBenefits?: Record<string, number>;
+  gamFutureUse?: Record<string, number>;
   openEnded?: Record<string, string>;
   submittedAtIso: string;
 }

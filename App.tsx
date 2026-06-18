@@ -3,12 +3,13 @@ import {
   Alert,
   KeyboardAvoidingView,
   Platform,
-  SafeAreaView,
+  Pressable,
   ScrollView,
   StyleSheet,
   Text,
   View
 } from 'react-native';
+import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { AppButton } from './src/components/Button';
 import { Card } from './src/components/Card';
 import { FormField } from './src/components/FormField';
@@ -18,7 +19,7 @@ import { ProgressBar } from './src/components/ProgressBar';
 import { QuestionCard } from './src/components/QuestionCard';
 import { lessonModules } from './src/data/modules';
 import { posttestQuestions, pretestQuestions } from './src/data/questions';
-import { questionnaireItems } from './src/data/questionnaire';
+import { gamificationQuestionnaire} from './src/data/questionnaire';
 import {
   AppStep,
   BackgroundProfile,
@@ -33,8 +34,7 @@ import {
   buildLikertRecord,
   calculateTestScore,
   createInitialGamificationState,
-  isAllQuestionsAnswered,
-  meanScore
+  isAllQuestionsAnswered
 } from './src/utils/scoring';
 import { nowIso, secondsSince } from './src/utils/time';
 import {
@@ -93,16 +93,11 @@ export default function App() {
   const [gamificationState, setGamificationState] = useState<GamificationState>(
     createInitialGamificationState()
   );
-  const [engagement, setEngagement] = useState(() => buildLikertRecord(questionnaireItems.engagement));
-  const [motivation, setMotivation] = useState(() => buildLikertRecord(questionnaireItems.motivation));
-  const [usability, setUsability] = useState(() => buildLikertRecord(questionnaireItems.usability));
-  const [satisfaction, setSatisfaction] = useState(() => buildLikertRecord(questionnaireItems.satisfaction));
-  const [perceivedDifficulty, setPerceivedDifficulty] = useState(() =>
-    buildLikertRecord(questionnaireItems.perceivedDifficulty)
-  );
-  const [gamificationElements, setGamificationElements] = useState(() =>
-    buildLikertRecord(questionnaireItems.gamificationElements)
-  );
+  const [gamViews, setGamViews] = useState(() => buildLikertRecord(gamificationQuestionnaire.section1.items));
+  const [gamMotivation, setGamMotivation] = useState(1);
+  const [gamBasicNeeds, setGamBasicNeeds] = useState(() => buildLikertRecord(gamificationQuestionnaire.section3.items));
+  const [gamBenefits, setGamBenefits] = useState(() => buildLikertRecord(gamificationQuestionnaire.section4.items));
+  const [gamFutureUse, setGamFutureUse] = useState(() => buildLikertRecord(gamificationQuestionnaire.section5.items));
   const [openEndedMostUseful, setOpenEndedMostUseful] = useState('');
   const [openEndedLeastUseful, setOpenEndedLeastUseful] = useState('');
   const [openEndedImprovement, setOpenEndedImprovement] = useState('');
@@ -220,7 +215,6 @@ export default function App() {
       moduleId: module.id,
       quizAnswer: selectedOption,
       quizCorrect: selectedOption === module.quiz.correctOptionId,
-      completedAtIso: nowIso(),
       timeSpentSeconds: secondsSince(lessonStartMs)
     };
 
@@ -244,19 +238,20 @@ export default function App() {
     const result: QuestionnaireResult = {
       respondentId: profile.respondentId,
       group: profile.group,
-      engagement,
-      motivation,
-      usability,
-      satisfaction,
-      perceivedDifficulty,
-      gamificationElements: isGamified ? gamificationElements : undefined,
-      openEnded: isGamified
+      ...(isGamified
         ? {
-            mostUseful: openEndedMostUseful,
-            leastUseful: openEndedLeastUseful,
-            improvement: openEndedImprovement
+            gamViews,
+            gamMotivation,
+            gamBasicNeeds,
+            gamBenefits,
+            gamFutureUse,
+            openEnded: {
+              mostUseful: openEndedMostUseful,
+              leastUseful: openEndedLeastUseful,
+              improvement: openEndedImprovement
+            }
           }
-        : undefined,
+        : {}),
       submittedAtIso: nowIso()
     };
 
@@ -265,7 +260,7 @@ export default function App() {
       await saveQuestionnaire(result);
       setStep('complete');
     } catch (error) {
-      Alert.alert('Save failed', 'Questionnaire was not saved.');
+      Alert.alert('Save failed', 'Questionnaire could not be saved locally.');
       console.error(error);
     } finally {
       setIsSaving(false);
@@ -281,15 +276,15 @@ export default function App() {
             The researcher will assign each respondent to a testing group.
           </Text>
           <FormField
-            label="Respondent ID"
-            placeholder="Example: R001"
+            label="Your Name"
+            placeholder="Example: Dennis"
             value={profile.respondentId}
             autoCapitalize="characters"
             onChangeText={(value) => updateProfile('respondentId', value)}
           />
           <FormField
-            label="Group Code"
-            placeholder="ON/OFF or A/B"
+            label="Gammification"
+            placeholder="ON/OFF"
             value={groupCode}
             autoCapitalize="characters"
             onChangeText={setGroupCode}
@@ -304,12 +299,23 @@ export default function App() {
     return (
       <Screen title="Demographic Data" subtitle="Collected before the learning session.">
         <Card>
-          <FormField label="Age" keyboardType="numeric" value={profile.age} onChangeText={(v) => updateProfile('age', v)} />
+          <FormField label="Age"
+          placeholder="Example: 25"
+          keyboardType="numeric" 
+          value={profile.age} 
+          onChangeText={(v) => updateProfile('age', v)} />
           <FormField label="Gender" value={profile.gender} onChangeText={(v) => updateProfile('gender', v)} />
-          <FormField label="Occupation" value={profile.occupation} onChangeText={(v) => updateProfile('occupation', v)} />
-          <FormField label="Education level" value={profile.education} onChangeText={(v) => updateProfile('education', v)} />
+          <FormField label="Occupation" 
+            placeholder="e.g., Teacher, Engineer, Student" 
+            value={profile.occupation} 
+            onChangeText={(v) => updateProfile('occupation', v)} />
+          <FormField label="Education level" 
+            placeholder="e.g., SMP, SMA, S1, etc." 
+            value={profile.education} 
+            onChangeText={(v) => updateProfile('education', v)} />
           <FormField
             label="Working/studying hours per day"
+            placeholder="Example: 8"
             value={profile.workingOrStudyingHours}
             onChangeText={(v) => updateProfile('workingOrStudyingHours', v)}
           />
@@ -491,23 +497,51 @@ export default function App() {
   function renderQuestionnaire() {
     return (
       <Screen title="Post-Use Questionnaire" subtitle="1 = strongly disagree, 5 = strongly agree.">
-        <LikertSection title="Engagement" items={questionnaireItems.engagement} values={engagement} onChange={setEngagement} />
-        <LikertSection title="Motivation" items={questionnaireItems.motivation} values={motivation} onChange={setMotivation} />
-        <LikertSection title="Usability" items={questionnaireItems.usability} values={usability} onChange={setUsability} />
-        <LikertSection title="Satisfaction" items={questionnaireItems.satisfaction} values={satisfaction} onChange={setSatisfaction} />
-        <LikertSection
-          title="Perceived Difficulty"
-          items={questionnaireItems.perceivedDifficulty}
-          values={perceivedDifficulty}
-          onChange={setPerceivedDifficulty}
-        />
+        {/* Gamification-attitude questions — ON group only */}
         {isGamified ? (
           <>
             <LikertSection
-              title="Gamification Elements"
-              items={questionnaireItems.gamificationElements}
-              values={gamificationElements}
-              onChange={setGamificationElements}
+              title={gamificationQuestionnaire.section1.title}
+              stem={gamificationQuestionnaire.section1.stem}
+              items={gamificationQuestionnaire.section1.items}
+              values={gamViews}
+              onChange={setGamViews}
+            />
+            <Card>
+              <Text style={styles.cardTitle}>{gamificationQuestionnaire.section2.title}</Text>
+              <Text style={styles.paragraph}>{gamificationQuestionnaire.section2.question}</Text>
+              {gamificationQuestionnaire.section2.options.map((option, index) => (
+                <Pressable
+                  key={option}
+                  onPress={() => setGamMotivation(index + 1)}
+                  style={[radioStyle.option, gamMotivation === index + 1 && radioStyle.optionSelected]}
+                >
+                  <Text style={[radioStyle.optionText, gamMotivation === index + 1 && radioStyle.optionTextSelected]}>
+                    {option}
+                  </Text>
+                </Pressable>
+              ))}
+            </Card>
+            <LikertSection
+              title={gamificationQuestionnaire.section3.title}
+              stem={gamificationQuestionnaire.section3.stem}
+              items={gamificationQuestionnaire.section3.items}
+              values={gamBasicNeeds}
+              onChange={setGamBasicNeeds}
+            />
+            <LikertSection
+              title={gamificationQuestionnaire.section4.title}
+              stem={gamificationQuestionnaire.section4.stem}
+              items={gamificationQuestionnaire.section4.items}
+              values={gamBenefits}
+              onChange={setGamBenefits}
+            />
+            <LikertSection
+              title={gamificationQuestionnaire.section5.title}
+              stem={gamificationQuestionnaire.section5.stem}
+              items={gamificationQuestionnaire.section5.items}
+              values={gamFutureUse}
+              onChange={setGamFutureUse}
             />
             <Card>
               <Text style={styles.cardTitle}>Open-ended Feedback</Text>
@@ -543,24 +577,54 @@ export default function App() {
 
   function renderComplete() {
     const gain = posttestScore - pretestScore;
+    const gainColor = gain > 0 ? '#0F7A3B' : gain < 0 ? '#B42318' : '#64748B';
+    const gainBg = gain > 0 ? '#DCFCE7' : gain < 0 ? '#FEE2E2' : '#F1F5F9';
+    const gainSign = gain > 0 ? '+' : '';
     return (
-      <Screen title="Study Completed" subtitle="Thank you for participating.">
+      <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
+        <View style={completeStyles.hero}>
+          <View style={completeStyles.iconCircle}>
+            <Text style={completeStyles.iconEmoji}>🎉</Text>
+          </View>
+          <Text style={completeStyles.heroTitle}>Study Completed!</Text>
+          <Text style={completeStyles.heroSubtitle}>Thank you for participating.</Text>
+        </View>
+
+        <View style={completeStyles.badgeRow}>
+          <View style={completeStyles.badge}>
+            <Text style={completeStyles.badgeText}>ID: {profile.respondentId}</Text>
+          </View>
+          <View style={[completeStyles.badge, isGamified && completeStyles.groupBadgeOn]}>
+            <Text style={[completeStyles.badgeText, isGamified && completeStyles.groupBadgeOnText]}>
+              {isGamified ? '✦ Gamification ON' : 'Gamification OFF'}
+            </Text>
+          </View>
+        </View>
+
         <Card>
-          <Text style={styles.cardTitle}>Local Summary</Text>
-          <Text style={styles.summaryText}>Respondent ID: {profile.respondentId}</Text>
-          <Text style={styles.summaryText}>Group: {isGamified ? 'Gamification ON' : 'Gamification OFF'}</Text>
-          <Text style={styles.summaryText}>Pretest score: {pretestScore}</Text>
-          <Text style={styles.summaryText}>Posttest score: {posttestScore}</Text>
-          <Text style={styles.summaryText}>Gain score: {gain}</Text>
-          <Text style={styles.summaryText}>Engagement mean: {meanScore(engagement).toFixed(2)}</Text>
-          <Text style={styles.summaryText}>Motivation mean: {meanScore(motivation).toFixed(2)}</Text>
-          <Text style={styles.summaryText}>Usability mean: {meanScore(usability).toFixed(2)}</Text>
-          <Text style={styles.summaryText}>Satisfaction mean: {meanScore(satisfaction).toFixed(2)}</Text>
+          <Text style={styles.cardTitle}>Test Scores</Text>
+          <View style={completeStyles.scoreRow}>
+            <View style={completeStyles.scoreBox}>
+              <Text style={completeStyles.scoreLabel}>Pretest</Text>
+              <Text style={completeStyles.scoreValue}>{pretestScore}</Text>
+            </View>
+            <View style={completeStyles.scoreDivider} />
+            <View style={completeStyles.scoreBox}>
+              <Text style={completeStyles.scoreLabel}>Posttest</Text>
+              <Text style={completeStyles.scoreValue}>{posttestScore}</Text>
+            </View>
+          </View>
+          <View style={completeStyles.gainRow}>
+            <Text style={completeStyles.gainLabel}>Learning Gain</Text>
+            <View style={[completeStyles.gainBadge, { backgroundColor: gainBg }]}>
+              <Text style={[completeStyles.gainValue, { color: gainColor }]}>
+                {gainSign}{gain} pts
+              </Text>
+            </View>
+          </View>
         </Card>
-        <Text style={styles.helperText}>
-          If Firebase is configured, the data has been saved to Firestore. If not, check the Expo terminal logs for LOCAL ONLY output.
-        </Text>
-      </Screen>
+
+      </ScrollView>
     );
   }
 
@@ -590,11 +654,13 @@ export default function App() {
   }
 
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-        {renderStep()}
-      </KeyboardAvoidingView>
-    </SafeAreaView>
+    <SafeAreaProvider>
+      <SafeAreaView style={styles.safeArea}>
+        <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+          {renderStep()}
+        </KeyboardAvoidingView>
+      </SafeAreaView>
+    </SafeAreaProvider>
   );
 }
 
@@ -616,15 +682,17 @@ function Screen({ title, subtitle, children }: ScreenProps) {
 
 interface LikertSectionProps {
   title: string;
+  stem?: string;
   items: readonly string[];
   values: Record<string, number>;
   onChange: React.Dispatch<React.SetStateAction<Record<string, number>>>;
 }
 
-function LikertSection({ title, items, values, onChange }: LikertSectionProps) {
+function LikertSection({ title, stem, items, values, onChange }: LikertSectionProps) {
   return (
     <Card>
       <Text style={styles.cardTitle}>{title}</Text>
+      {stem ? <Text style={styles.paragraph}>{stem}</Text> : null}
       {items.map((item, index) => {
         const key = `item_${index + 1}`;
         return (
@@ -721,4 +789,174 @@ const styles = StyleSheet.create({
     fontSize: 15,
     lineHeight: 24
   }
+});
+
+const completeStyles = StyleSheet.create({
+  hero: {
+    alignItems: 'center',
+    paddingVertical: 24,
+  },
+  iconCircle: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: '#EEF3FF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 16,
+    shadowColor: '#2F6FED',
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 3,
+  },
+  iconEmoji: {
+    fontSize: 38,
+  },
+  heroTitle: {
+    fontSize: 30,
+    fontWeight: '900',
+    color: '#111827',
+    marginBottom: 6,
+    textAlign: 'center',
+  },
+  heroSubtitle: {
+    fontSize: 15,
+    color: '#64748B',
+    textAlign: 'center',
+  },
+  badgeRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 8,
+    marginBottom: 8,
+  },
+  badge: {
+    backgroundColor: '#F1F5F9',
+    borderRadius: 20,
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+  },
+  badgeText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#475569',
+  },
+  groupBadgeOn: {
+    backgroundColor: '#EEF3FF',
+    borderColor: '#BFD0FF',
+    borderWidth: 1,
+  },
+  groupBadgeOnText: {
+    color: '#2F6FED',
+  },
+  scoreRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginVertical: 8,
+  },
+  scoreBox: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  scoreDivider: {
+    width: 1,
+    height: 48,
+    backgroundColor: '#E2E8F0',
+  },
+  scoreLabel: {
+    fontSize: 13,
+    color: '#64748B',
+    fontWeight: '600',
+    marginBottom: 4,
+  },
+  scoreValue: {
+    fontSize: 36,
+    fontWeight: '900',
+    color: '#111827',
+  },
+  gainRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: 12,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#F1F5F9',
+  },
+  gainLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#475569',
+  },
+  gainBadge: {
+    borderRadius: 20,
+    paddingHorizontal: 14,
+    paddingVertical: 5,
+  },
+  gainValue: {
+    fontSize: 14,
+    fontWeight: '800',
+  },
+  metricRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginVertical: 5,
+  },
+  metricLabel: {
+    fontSize: 13,
+    color: '#475569',
+    width: 90,
+    fontWeight: '500',
+  },
+  barTrack: {
+    flex: 1,
+    height: 8,
+    backgroundColor: '#E2E8F0',
+    borderRadius: 4,
+    overflow: 'hidden',
+    marginHorizontal: 10,
+  },
+  barFill: {
+    height: 8,
+    backgroundColor: '#2F6FED',
+    borderRadius: 4,
+  },
+  metricValue: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#1F2937',
+    width: 36,
+    textAlign: 'right',
+  },
+  scaleNote: {
+    fontSize: 11,
+    color: '#94A3B8',
+    textAlign: 'right',
+    marginTop: 8,
+  },
+});
+
+const radioStyle = StyleSheet.create({
+  option: {
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    backgroundColor: '#F8FAFC',
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    marginVertical: 4,
+  },
+  optionSelected: {
+    backgroundColor: '#EEF3FF',
+    borderColor: '#2F6FED',
+  },
+  optionText: {
+    fontSize: 14,
+    color: '#475569',
+  },
+  optionTextSelected: {
+    color: '#2F6FED',
+    fontWeight: '700',
+  },
 });
