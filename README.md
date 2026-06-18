@@ -1,4 +1,4 @@
-# DENNIS Gamified Coding Mobile MVP
+# Gamified Coding Mobile MVP
 
 This is a starter mobile application for a research project comparing two versions of the same microlearning coding app:
 
